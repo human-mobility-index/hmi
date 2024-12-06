@@ -48,6 +48,16 @@ Example Usage: HMI
 ``` python
  import hmi 
 ``` 
+
+## Citation
+
+If you use the package please cite:
+
+[Özak, Ömer. "Distance to the pre-industrial technological frontier and economic development." Journal of Economic Growth 23.2 (2018): 175-221.](http://rdcu.be/I4YI)
+
+[Özak, Ömer. "The voyage of homo-economicus: Some economic measures of distance." Department of Economics, Brown University (2010).](http://omerozak.com/pdf/Ozak_voyage.pdf)
+
+and the package itself.
  
 Issues
 ------
