@@ -1,7 +1,7 @@
 The Human Mobility Index Python package - `hmi`
 ===========
 
-<a href="https://pypi.python.org/pypi/hmi/">![PyPiVersion](https://img.shields.io/pypi/v/hmi.svg)</a> <a href="">![Pyversions](https://img.shields.io/pypi/pyversions/hmi.svg)</a> <a href="https://hmi.readthedocs.io/en/latest/">![ReadTheDocs](https://readthedocs.org/projects/hmi/badge/?version=latest&style=plastic)</a>
+<a href="https://pypi.python.org/pypi/hmi/">![PyPiVersion](https://img.shields.io/pypi/v/hmi.svg)</a> <a href="">![Pyversions](https://img.shields.io/pypi/pyversions/hmi.svg)</a> <a href="https://hmi.readthedocs.io/en/latest/">![ReadTheDocs](https://readthedocs.org/projects/hmi/badge/?version=latest&style=plastic)</a> <a>[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14291904.svg)](https://doi.org/10.5281/zenodo.14291904)</a>
 
 The ``hmi`` package is a python module that provides an interface to compute distances between locations based on [Özak's (2018, ](http://rdcu.be/I4YI)[2010)](http://omerozak.com/pdf/Ozak_voyage.pdf) [Human Mobility Index](https://human-mobility-index.github.io/). There are three main classes of computations based on the Human Mobility Index:
 
