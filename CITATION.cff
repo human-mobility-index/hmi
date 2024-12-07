@@ -6,5 +6,8 @@ authors:
     orcid: https://orcid.org/0000-0001-6421-2801
 title: "The Human Mobility Index Python package - `hmi`"
 license: GPL-3.0-or-later
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.14291903
 version: 0.1
 date-released: 2024-12-06
