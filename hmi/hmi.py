@@ -374,7 +374,8 @@ class HMI(object):
         allo[allo==-1] = self.costs.nodata_value
         voronoi_raster = gr.GeoRaster(allo, self.costs.geot, nodata_value=self.costs.nodata_value, projection=self.costs.projection, datatype=self.costs.datatype)
         voronoi = []
-        for shp, val in rasterio.features.shapes(allo, transform=Affine.from_gdal(*self.costs.geot)):
+        # rasterio < 1.5 does not accept int64 arrays
+        for shp, val in rasterio.features.shapes(allo.astype(np.int32), transform=Affine.from_gdal(*self.costs.geot)):
             voronoi.append([val, shape(shp)])
         voronoi = gp.GeoDataFrame(voronoi, crs=cea, columns=[self.file + 'ID', 'geometry'])
         voronoi = voronoi.merge(self.sources[self.sources.columns.difference(['geometry'])], on=self.file + 'ID')

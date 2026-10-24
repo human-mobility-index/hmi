@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hmi"
-version = "0.1"
+version = "0.2"
 authors = [
   { name="Ömer Özak", email="omer@omerozak.com" },
 ]
@@ -24,6 +24,13 @@ dependencies = [
     "requests",
     "tqdm",
 ]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Topic :: Utilities",

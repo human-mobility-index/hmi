@@ -19,10 +19,10 @@ It includes tools to
 Install
 -------
 
-Given the requirements of the package, the best way to install is to first create a `mamba/conda`  environment as follows (this creates an `python-3.11` environment and adds some basic packages that are needed).
+The package depends on GDAL (through `georasters` and `rasterio`), which `pip` cannot build without a system GDAL library. The best way to install is to first create a `mamba/conda` environment with the geospatial dependencies from `conda-forge`:
 
 ```bash
-mamba create --name HMI --override-channels -c conda-forge python=3.11 pip geopandas georasters jupyterlab jupyter seaborn geoplot pysal 
+mamba create --name HMI --override-channels -c conda-forge python=3.12 pip gdal geopandas georasters rasterio scikit-image requests tqdm
 ```
 
 activate the environment
@@ -34,20 +34,53 @@ mamba activate HMI
 then 
 
 ```bash
- pip install hmi
+pip install hmi
 ```
  or
 
 ```bash
- pip install git+git://github.com/ozak/hmi.git
+pip install git+https://github.com/human-mobility-index/hmi.git
 ```
+
+The first time you `import hmi`, the package downloads the HMI cost surfaces (about 4.5 GB) from [Zenodo](https://doi.org/10.5281/zenodo.14285746) into its `data/` folder. This is done only once.
 
 Example Usage: HMI
 -------------------------
 
+Sources and destinations are (Geo)Pandas data frames with latitude and longitude (or projected CEA `x`/`y`) columns. Distances are measured in weeks of travel.
+
 ``` python
- import hmi 
-``` 
+import pandas as pd
+import hmi
+
+sources = pd.DataFrame({'name': ['Addis Ababa', 'London'],
+                        'lat': [9.03, 51.51], 'lon': [38.74, -0.13]})
+destinations = pd.DataFrame({'name': ['Cairo', 'Beijing', 'Sydney'],
+                             'lat': [30.04, 39.90, -33.87], 'lon': [31.24, 116.41, 151.21]})
+
+# Land-only mobility (use hmi.HMISea to add pre-1500CE seafaring)
+A = hmi.HMI(sources, destinations, lat='lat', lon='lon')
+A.correct_data()             # move points that fall off the cost surface onto it
+A.HMIdistance(routes=True)   # travel times, isolation and optimal routes
+A.hmidist                    # GeoDataFrame with one row per reachable pair
+
+# Regions closest (in travel time) to each source
+regions = A.voronoi()
+```
+
+Pairs that cannot be reached (e.g. London over land only) are dropped from `hmidist`. Use `A.HMIdistance(export_shape=True, export_raster=True, path='./')` to write the routes as GeoJSON and the travel-time surfaces as GeoTIFFs.
+
+Testing
+-------
+
+From a clone of the repository, inside the environment above:
+
+```bash
+pip install pytest
+pytest
+```
+
+The tests compute HMI and HMISea distances, isolation, routes and Voronoi regions for a few world cities and compare them with known values.
 
 ## Citation
 
@@ -57,7 +90,9 @@ If you use the package please cite:
 
 [Özak, Ömer. "The voyage of homo-economicus: Some economic measures of distance." Department of Economics, Brown University (2010).](http://omerozak.com/pdf/Ozak_voyage.pdf)
 
-and the package itself.
+and the package itself
+
+[Özak, Ömer. “The Human Mobility Index Python Package - `hmi`”. Zenodo, December 7, 2024. https://doi.org/10.5281/zenodo.14291912.](https://doi.org/10.5281/zenodo.14291912)
  
 Issues
 ------
