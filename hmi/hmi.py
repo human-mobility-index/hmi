@@ -8,18 +8,10 @@ GitHub:  https://github.com/ozak/
 ======================================================
 Package to compute distances using HMI, HMISea and HMIOcean
 '''
-from __future__ import division
-import sys, os, time
-from osgeo import gdal, gdalnumeric, ogr, osr
-from osgeo.gdalconst import *
+import os
 import numpy as np
 import pandas as pd
-from rasterstats import zonal_stats
-import pysal as ps
-import shapely
-from shapely.geometry import Polygon, Point, LineString
-from shapely.wkt import loads, dumps
-from shapely.ops import cascaded_union
+from shapely.geometry import LineString
 import rasterio.features
 from affine import Affine
 from shapely.geometry import shape
@@ -27,16 +19,11 @@ import georasters as gr
 import pyproj
 from pyproj import CRS
 import geopandas as gp
-from geopy.distance import great_circle
 import skimage.graph as graph
-import multiprocessing as mp
-from multiprocessing import Pool, Lock
 import warnings
-from fiona.crs import from_string
 from skimage.segmentation import watershed
 
 path=os.path.dirname(os.path.abspath(__file__))+'/data/'
-cea2 = from_string('+proj=cea +lon_0=0 +lat_ts=0 +x_0=0 +y_0=0 +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
 wgs84 = CRS("EPSG:4326")
 cea = CRS("ESRI:54034")
 
@@ -480,11 +467,3 @@ class HMIOcean(HMI):
         self.hmioceandist = self.hmidist
     pass
 '''
-
-def download():
-    path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
-    urlretrieve('https://zenodo.org/records/14285746/files/HMI.tif?download=1', filename=path+'HMI.tif')
-    urlretrieve('https://zenodo.org/records/14285746/files/HMISea.tif?download=1', filename=path+'HMISea.tif')
-    urlretrieve('https://zenodo.org/records/14285746/files/HMI10.tif?download=1', filename=path+'HMI10.tif')
-    urlretrieve('https://zenodo.org/records/14285746/files/HMISea10.tif?download=1', filename=path+'HMISea10.tif')    
-    pass
