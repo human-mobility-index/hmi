@@ -246,8 +246,11 @@ class HMI(object):
             cc = cc + xmin
             dist = (rr - row)**2 + (cc - col)**2
             inside = dist <= maxmove**2
-            if inside.any():
-                k = np.flatnonzero(inside)[dist[inside].argmin()]
+            rr, cc, dist = rr[inside], cc[inside], dist[inside]
+            if rr.size:
+                # Nearest cell; ties go to the smallest row (north), then the smallest column (west).
+                # Distances are exact integers, so the choice is the same on every machine.
+                k = np.lexsort((cc, rr, dist))[0]
                 points.loc[i[0], 'row'] = rr[k]
                 points.loc[i[0], 'col'] = cc[k]
     pass

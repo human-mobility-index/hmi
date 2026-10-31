@@ -130,3 +130,23 @@ def test_floor_option():
     expected = B.costs.raster[B.destinations.row.values, B.destinations.col.values]
     assert np.allclose(B.destinations[B.file + 'costs'], expected)
     assert hmi.HMISea(SOURCES, DESTINATIONS, lat='lat', lon='lon', floor=True).floor
+
+
+def test_correct_ties_are_deterministic():
+    import georasters as gr
+    A = hmi.HMI(SOURCES.iloc[:1], DESTINATIONS.iloc[:1], lat='lat', lon='lon')
+    # 5x5 surface: only the four cells at distance 1 from the centre (2,2) are valid
+    data = np.full((5, 5), -9.0)
+    for r, c in [(1, 2), (2, 1), (2, 3), (3, 2)]:
+        data[r, c] = 1.0
+    A.costs = gr.GeoRaster(np.ma.masked_equal(data, -9.0), (0, 1, 0, 0, 0, -1), nodata_value=-9)
+    pts = pd.DataFrame({'row': [2], 'col': [2], A.file + 'costs': [np.nan]})
+    A._correct_points(pts, maxmove=2)
+    # Tie among the four neighbours goes to the northernmost (smallest row)
+    assert (pts.row[0], pts.col[0]) == (1, 2)
+    # Without the northern cell, the tie goes to the westernmost of the remaining row
+    data[1, 2] = -9.0
+    A.costs = gr.GeoRaster(np.ma.masked_equal(data, -9.0), (0, 1, 0, 0, 0, -1), nodata_value=-9)
+    pts = pd.DataFrame({'row': [2], 'col': [2], A.file + 'costs': [np.nan]})
+    A._correct_points(pts, maxmove=2)
+    assert (pts.row[0], pts.col[0]) == (2, 1)
