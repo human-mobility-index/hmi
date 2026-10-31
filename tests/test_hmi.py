@@ -77,3 +77,56 @@ def test_voronoi():
     assert v.crs == hmi.cea
     assert sorted(v.name.unique()) == ['Addis Ababa', 'London']
     assert v.geometry.is_valid.all()
+
+
+# Points just off the coast (in the sea) that correct_data should move onto land
+OFFSHORE = pd.DataFrame({'name': ['Cairo', 'Off Alexandria', 'Off Beirut'],
+                         'lat': [30.04, 31.4, 33.9], 'lon': [31.24, 29.9, 35.3]})
+
+
+def test_correct_data_moves_offshore_points():
+    A = hmi.HMI(SOURCES.iloc[:1], OFFSHORE, lat='lat', lon='lon')
+    A.costs_all()
+    off = A.destinations[A.file + 'costs'].isnull()
+    assert off.tolist() == [False, True, True]
+    A.correct_data(maxmove=10)
+    moved = A.destinations.loc[off]
+    # Moved onto valid cells, within maxmove cells (Euclidean) of the original location
+    assert (A.costs.raster[moved.row.values, moved.col.values] >= 0).all()
+    assert not np.ma.is_masked(A.costs.raster[moved.row.values, moved.col.values])
+    d2 = (moved.row - moved.originalrow)**2 + (moved.col - moved.originalcol)**2
+    assert ((d2 > 0) & (d2 <= 10**2)).all()
+    # Points on the surface stay put
+    assert (A.destinations.loc[~off, 'row'] == A.destinations.loc[~off, 'originalrow']).all()
+    # All destinations, including the last one, are now reachable
+    A.HMIdistance()
+    assert sorted(A.hmidist[A.file + 'ID2'].astype(int)) == [1, 2, 3]
+
+
+def test_correct_data_respects_maxmove():
+    A = hmi.HMI(SOURCES.iloc[:1], OFFSHORE, lat='lat', lon='lon')
+    A.correct_data(maxmove=0)
+    assert (A.destinations.row == A.destinations.originalrow).all()
+    assert (A.destinations.col == A.destinations.originalcol).all()
+    A.HMIdistance()
+    assert sorted(A.hmidist[A.file + 'ID2'].astype(int)) == [1]
+
+
+def test_floor_option():
+    A = hmi.HMI(SOURCES, DESTINATIONS, lat='lat', lon='lon')
+    B = hmi.HMI(SOURCES, DESTINATIONS, lat='lat', lon='lon', floor=True)
+    assert not A.floor and B.floor
+    g = A.costs
+    for df in (A.destinations, A.sources):
+        col = (df.x - g.xmin) / g.x_cell_size
+        row = (df.y - g.ymax) / g.y_cell_size
+        assert (df.col == np.round(col)).all() and (df.row == np.round(row)).all()
+    for df in (B.destinations, B.sources):
+        col = (df.x - g.xmin) / g.x_cell_size
+        row = (df.y - g.ymax) / g.y_cell_size
+        assert (df.col == np.floor(col)).all() and (df.row == np.floor(row)).all()
+    # costs_points uses the same rule as the stored rows/cols
+    B.costs_destinations()
+    expected = B.costs.raster[B.destinations.row.values, B.destinations.col.values]
+    assert np.allclose(B.destinations[B.file + 'costs'], expected)
+    assert hmi.HMISea(SOURCES, DESTINATIONS, lat='lat', lon='lon', floor=True).floor

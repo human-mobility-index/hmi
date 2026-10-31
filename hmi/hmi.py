@@ -55,12 +55,15 @@ class HMI(object):
         fast: Use small cost surface or not
         file: Type of cost
         clip: Polygon or GeoPandas DataFrame to clip region for faster local analysis
+        floor: Boolean (default False). If True, points are assigned to the cell that contains them (floor);
+                otherwise to the nearest cell corner (round), as in georasters' ``map_pixel``
     """
     # Initialize Object
-    def __init__(self, sources, destinations, lat=None, lon=None, x=None, y=None, projected=None, fast=True, file='HMI', clip=None):
+    def __init__(self, sources, destinations, lat=None, lon=None, x=None, y=None, projected=None, fast=True, file='HMI', clip=None, floor=False):
         super(HMI, self).__init__()
         self.fast = fast
         self.clip = clip
+        self.floor = floor
         self.projected = projected
         self.costs = None
         self.mcp_cost = None
@@ -157,9 +160,20 @@ class HMI(object):
         original_mask = self.costs.raster.mask
         self.costs.raster.data[original_mask] = -9
         self.costs.nodata_value = -9
-        self.sources['row'], self.sources['col'] = self.costs.map_pixel_location(self.sources.x, self.sources.y)
-        self.destinations['row'], self.destinations['col'] = self.costs.map_pixel_location(self.destinations.x, self.destinations.y)
+        self.sources['row'], self.sources['col'] = self.pixel_location(self.sources.x, self.sources.y)
+        self.destinations['row'], self.destinations['col'] = self.pixel_location(self.destinations.x, self.destinations.y)
     pass
+    # Map (x,y) points to (row,col) on the cost surface
+    def pixel_location(self, x_points, y_points):
+        """
+        Returns the rows and columns of the cost surface cells for points at (x,y), using ``self.floor``
+        to choose between rounding (default) and flooring in georasters' ``map_pixel``
+
+        Usage:
+            A.pixel_location(A.sources.x, A.sources.y)
+        """
+        return gr.map_pixel(x_points, y_points, self.costs.x_cell_size, self.costs.y_cell_size,
+                            self.costs.xmin, self.costs.ymax, floor=self.floor)
     # Show cost on HMI cost surface of points at (x,y)
     def costs_points(self, x_points, y_points):
         """
@@ -171,7 +185,12 @@ class HMI(object):
         """
         if not self.costs:
             self.load_data()
-        return self.costs.map_pixel(x_points, y_points)
+        row, col = self.pixel_location(x_points, y_points)
+        try:
+            return self.costs.raster[row, col]
+        except IndexError:
+            raise gr.RasterGeoError('Make sure the points belong to the raster coverage \
+                                    and are in the correct geographic coordinate system.')
     # Costs for sources
     def costs_sources(self):
         """
@@ -205,6 +224,33 @@ class HMI(object):
         self.costs_destinations()
     pass
     # Correct bad locations
+    def _correct_points(self, points, maxmove):
+        """
+        Move each point in ``points`` (sources or destinations) without costs to the nearest cell
+        with non-negative costs that lies within ``maxmove`` cells (Euclidean distance).
+        Points with no such cell are left unchanged.
+        """
+        problem = points[points[self.file+'costs'].isnull()]
+        rows, cols = self.costs.shape
+        for i in problem.iterrows():
+            row, col = int(i[1].row), int(i[1].col)
+            xmin = max(col - maxmove, 0)
+            xmax = min(col + maxmove + 1, cols)
+            ymin = max(row - maxmove, 0)
+            ymax = min(row + maxmove + 1, rows)
+            costn = self.costs.raster[ymin:ymax, xmin:xmax]
+            # Valid cells are those with non-negative costs that are not masked
+            valid = np.ma.filled(costn >= 0, False)
+            rr, cc = np.nonzero(valid)
+            rr = rr + ymin
+            cc = cc + xmin
+            dist = (rr - row)**2 + (cc - col)**2
+            inside = dist <= maxmove**2
+            if inside.any():
+                k = np.flatnonzero(inside)[dist[inside].argmin()]
+                points.loc[i[0], 'row'] = rr[k]
+                points.loc[i[0], 'col'] = cc[k]
+    pass
     def correct_sources(self, maxmove=100, keep=True):
         """
         Move location of sources outside of costs surface up to ``maxmove`` cells in order to have location on cost surface.
@@ -221,23 +267,7 @@ class HMI(object):
             self.sources['originalcol'] = self.sources['col']
         if (self.file+'costs' not in self.sources.columns):
             self.costs_sources()
-        problem = self.sources[self.sources[self.file+'costs'].isnull()]
-        rows, cols = self.costs.shape
-        for i in problem.iterrows():
-            xmin = max(i[1].col - maxmove,0)
-            xmax = min(i[1].col + maxmove,cols)
-            ymin = max(i[1].row - maxmove,0)
-            ymax = min(i[1].row + maxmove,rows)
-            costn = self.costs[ymin:ymax, xmin:xmax]
-            if not isinstance(costn.max(),np.ma.core.MaskedConstant):
-                costn = pd.DataFrame(costn>=0).stack().reset_index()
-                costn.columns = ['row','col','value']
-                costn['row'] = costn['row'] + ymin
-                costn['col'] = costn['col'] + xmin
-                costn['dist'] = (costn.row-i[1].row)**2 + (costn.col-i[1].col)**2
-                costn = costn.loc[costn.dist==costn.dist.min()]
-                self.sources.loc[i[0],'row'] = costn.row.values[0]
-                self.sources.loc[i[0],'col'] = costn.col.values[0]
+        self._correct_points(self.sources, maxmove)
     pass
     def correct_destinations(self, maxmove=100, keep=True):
         """
@@ -255,23 +285,7 @@ class HMI(object):
             self.destinations['originalcol'] = self.destinations['col']
         if (self.file+'costs' not in self.destinations.columns):
             self.costs_destinations()
-        problem = self.destinations[self.destinations[self.file+'costs'].isnull()]
-        rows, cols = self.costs.shape
-        for i in problem.iterrows():
-            xmin = max(i[1].col - maxmove,0)
-            xmax = min(i[1].col + maxmove,cols)
-            ymin = max(i[1].row - maxmove,0)
-            ymax = min(i[1].row + maxmove,rows)
-            costn = self.costs[ymin:ymax, xmin:xmax]
-            if not isinstance(costn.max(),np.ma.core.MaskedConstant):
-                costn = pd.DataFrame(costn>=0).stack().reset_index()
-                costn.columns = ['row','col','value']
-                costn['row'] = costn['row'] + ymin
-                costn['col'] = costn['col'] + xmin
-                costn['dist'] = (costn.row-i[1].row)**2 + (costn.col-i[1].col)**2
-                costn = costn.loc[costn.dist==costn.dist.min()]
-                self.destinations.loc[i[0],'row'] = costn.row.values[0]
-                self.destinations.loc[i[0],'col'] = costn.col.values[0]
+        self._correct_points(self.destinations, maxmove)
     pass
     def correct_data(self, maxmove=100, keep=True):
         """
@@ -408,10 +422,12 @@ class HMISea(HMI):
         x: Name of column with cylindrical equal area projected longitudes (if applicable)
         projected: Boolean, references is data is projected or not
         fast: Use small cost surface or not
+        floor: Boolean (default False). If True, points are assigned to the cell that contains them (floor);
+                otherwise to the nearest cell corner (round), as in georasters' ``map_pixel``
     """
     # Initialize Object
-    def __init__(self, sources, destinations, lat=None, lon=None, x=None, y=None, projected=None, fast=True, file='HMISea', clip=None):
-        super(HMISea, self).__init__(sources, destinations, lat=lat, lon=lon, x=x, y=y, projected=projected, fast=fast, file='HMISea', clip=clip)
+    def __init__(self, sources, destinations, lat=None, lon=None, x=None, y=None, projected=None, fast=True, file='HMISea', clip=None, floor=False):
+        super(HMISea, self).__init__(sources, destinations, lat=lat, lon=lon, x=x, y=y, projected=projected, fast=fast, file='HMISea', clip=clip, floor=floor)
     pass
     def HMISeadistance(self, isolation=True, export_raster=False, export_shape=False, routes=False, path='./'):
         """

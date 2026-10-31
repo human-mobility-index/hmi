@@ -68,7 +68,9 @@ A.hmidist                    # GeoDataFrame with one row per reachable pair
 regions = A.voronoi()
 ```
 
-Pairs that cannot be reached (e.g. London over land only) are dropped from `hmidist`. Use `A.HMIdistance(export_shape=True, export_raster=True, path='./')` to write the routes as GeoJSON and the travel-time surfaces as GeoTIFFs.
+`correct_data(maxmove=100)` moves each point that falls off the cost surface (e.g. a coastal city whose cell is in the sea) to the nearest valid cell within `maxmove` cells; points with no valid cell that close are left where they are. By default points are assigned to cells by rounding their coordinates, as in `georasters`; pass `floor=True` to `hmi.HMI`/`hmi.HMISea` to use the cell that contains each point instead.
+
+Pairs that cannot be reached (e.g. London over land only, or points that are still off the cost surface) are dropped from `hmidist`. Use `A.HMIdistance(export_shape=True, export_raster=True, path='./')` to write the routes as GeoJSON and the travel-time surfaces as GeoTIFFs.
 
 Testing
 -------
